@@ -1,7 +1,11 @@
+import json
+import os
 from requests import Session
 from requests.exceptions import ConnectionError, Timeout, TooManyRedirects
-import json
+from dotenv import load_dotenv
 
+load_dotenv()
+CMC_API_KEY = os.environ.get('CMC_API_KEY')
 url = 'https://pro-api.coinmarketcap.com/v1/cryptocurrency/listings/latest'
 parameters = {
   'start':'1',
@@ -10,7 +14,7 @@ parameters = {
 }
 headers = {
   'Accepts': 'application/json',
-  'X-CMC_PRO_API_KEY': '41d3889b-fcdd-4a41-a234-1ede763e2c4b',
+  'X-CMC_PRO_API_KEY': CMC_API_KEY,
 }
 
 session = Session()
@@ -43,21 +47,26 @@ def get_keys():
                     break
     return keys
 
-def get_info(coin):
+def get_info(coin) -> str:
     for d in data["data"]:
             if d["name"].lower() == coin:
                 qdata = d["quote"]
                 brldata = qdata["BRL"]
                 brldata = str(brldata).replace('{', '',1)
+                brldata = brldata.replace("'", '')
                 brldata = brldata.replace('}', '', 1)
-                return brldata
-    
+                strcoin = coin.title()
             if d["symbol"].lower() == coin:
+                
                 qdata = d["quote"]
                 brldata = qdata["BRL"]
                 brldata = str(brldata).replace('{', '',1)
+                brldata = brldata.replace("'", '')
                 brldata = brldata.replace('}', '', 1)
-                return brldata
+                strcoin = '$'+coin.upper()
+    
+    info = 'Ultima atualizacao de '+strcoin+':\n\n'
+    return info+brldata
 
 def get_data(coin):
     for d in data["data"]:

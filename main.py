@@ -1,90 +1,22 @@
 import time
+import os
 import sys
 import warnings
 import random
-import json
-from coinmarketcapapi import 
-from selenium import webdriver #Automatizador de acesso ao navegador
-from webdriver_manager.chrome import ChromeDriverManager #Driver específico do Chrome
-from selenium.webdriver.common.keys import Keys #Quando precisamos simular alguma tecla especial
+import coinmarketcapapi #API MODULE
+from dotenv import load_dotenv #ENVARIOMENT VARIABLES LIB
+from selenium import webdriver #AUTOMATIZATION LIB
+from webdriver_manager.chrome import ChromeDriverManager #MODULE FOR CHROME
+from selenium.webdriver.common.keys import Keys #SPECIAL KEYS MODULE
 from selenium.common import exceptions  
-from requests import Session
-from requests.exceptions import ConnectionError, Timeout, TooManyRedirects
 
+#SETING ENV VARIABLES
+load_dotenv()
+CHROME_PATH = os.environ.get('CHROME_PATH')
 
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 warnings.filterwarnings("ignore", category=UserWarning)
 IS_DEBUG = False 
-
-###################################################################################################
-### CoinMarketCap Api #############################################################################
-###################################################################################################
-
-url = 'https://pro-api.coinmarketcap.com/v1/cryptocurrency/listings/latest'
-parameters = {
-  'start':'1',
-  'limit':'5000',
-  'convert':'BRL'
-}
-headers = {
-  'Accepts': 'application/json',
-  'X-CMC_PRO_API_KEY': '41d3889b-fcdd-4a41-a234-1ede763e2c4b',
-}
-
-session = Session()
-session.headers.update(headers)
-
-try:
-  response = session.get(url, params=parameters)
-  data = json.loads(response.text)
-
-except (ConnectionError, Timeout, TooManyRedirects) as e:
-  print(e, '...\n')
-
-###################################################################################################
-
-def get_coins():  
-    coin_names = []
-    coin_symbols = []
-    i = 0
-    for d in data["data"]:
-        coin_names.append(d["name"].lower())
-        coin_symbols.append(d["symbol"].lower())
-        i += 1
-        if i == 500:
-            break
-    return coin_names + coin_symbols
-
-def get_keys():
-    keys = []
-    for d in data["data"]:
-            for k in d:
-                if k not in keys:
-                    keys.append(k)
-                else:
-                    break
-    return keys
-
-def get_info(coin):
-    info = 'Ultima informacao de '+coin+' em BRL:\n'
-    for d in data["data"]:
-            if d["name"].lower() == coin:
-                qdata = d["quote"]
-                brldata = qdata["BRL"]
-                brldata = str(brldata).replace('{', '',1)
-                brldata = brldata.replace('}', '', 1)
-    
-            if d["symbol"].lower() == coin:
-                qdata = d["quote"]
-                brldata = qdata["BRL"]
-                brldata = str(brldata).replace('{', '',1)
-                brldata = brldata.replace('}', '', 1)
-    return info+brldata
-
-def get_data(coin):
-    for d in data["data"]:
-        if d["name"].lower() == coin:
-            return d         
 
 
 def loading(message, lines=3, dots=3, speed = 200/1000): 
@@ -130,19 +62,17 @@ def call_faq(user_response):
     while True:
         
         if(not isEnding(user_response)):
-            # Caso seja agradecimento
             if(isThanks(user_response)):
                 bot_response = "Disponha. Estou aqui para lhe ajudar."
                 break
             else:
-                # Caso seja uma saudação inicial
                 if(greeting(user_response) != None):
                     bot_response = greeting(user_response)
                     break
                 else:
-                    # Caso seja uma moeda
-                    if user_response in get_coins():
-                        bot_response = get_info(user_response)
+                    # In case its a valid coin.
+                    if user_response in coinmarketcapapi.get_coins():
+                        bot_response = coinmarketcapapi.get_info(user_response)
                         break
         else:
             bot_response = "Até mais!"
@@ -180,61 +110,59 @@ def isEnding(sentence):
     return False
 
 
-# Navegar até WhatsApp Web
+# Open Whatsapp Web
 options = webdriver.ChromeOptions() 
-options.add_argument("user-data-dir=/home/claym0re/.config/google-chrome/") #Path to your chrome profile
+options.add_argument(CHROME_PATH) #Path to your chrome profile
 driver = webdriver.Chrome(ChromeDriverManager().install(), chrome_options=options)
 loading('Acessando o WhatsApp Web', 4, 4)
 driver.get('https://web.whatsapp.com/')
-#driver.maximize_window()
-print("\nEscaneie o QR Code, e então pressione ENTER")
-input()
+time.sleep(10) #Wait for connection
 
-# Variaveis 
+# Variables
 
 i = True
 log_msg = []
 a = 0
 user_msg = ''
 
-## START OF LINEAR CODE ##
+if __name__ == '__main__':
 
-while True:
-    contatos = driver.find_elements_by_css_selector("span[aria-label]") ##LIST of NON-READ-MESSAGES BOXES
-    for contato in contatos:    
-        try:
-           time.sleep(5)
-           contato.click()
-           username = driver.find_elements_by_xpath('//*[@id="main"]/header/div[2]/div[1]/div/span') #CONTACT NAME by TITLE
-           user = username[0].text
-           nrm = int(contato.text)  ##NUMBER of NON-READ-MESSAGES by User
-           print(f'\nMensagens nao lidas de {user}: {nrm}')
-           tim_msg = driver.find_elements_by_class_name("kOrB_") ##LIST of elements of MESSAGE-TIME
-           log_time = []        ##LIST of MESSAGE-TIME in STR FORMAT
-           for t in tim_msg:
-               log_time.append(t.text)
-           all_msg = driver.find_elements_by_css_selector(".copyable-text") ##LIST of elements of MESSAGE
-           last_msg = all_msg[-2]
-           for n, msg in enumerate(all_msg):
-               if msg != last_msg:
-                  message = all_msg[n].text
-                  log_msg.append(message)
-               else:
-                  break 
-           user_responde = read_msg(user, log_msg, log_time, nrm)
-           for m in user_responde:
-                   user_msg = m
-                   print('user: ', user_msg)
-                   bot_msg = call_faq(user_msg)
-                   time.sleep(2)
-                   print('bot :', bot_msg)
-                   send_msg(bot_msg)
-        except exceptions.StaleElementReferenceException:
-            continue
-        except:
-            print('...')
-            user_find() 
-            time.sleep(5)
-            continue
+    while True:
+        contatos = driver.find_elements_by_css_selector("span[aria-label]") ##LIST of NON-READ-MESSAGES BOXES
+        for contato in contatos:    
+            try:
+               time.sleep(5)
+               contato.click()
+               username = driver.find_elements_by_xpath('//*[@id="main"]/header/div[2]/div[1]/div/span') #CONTACT NAME by TITLE
+               user = username[0].text
+               nrm = int(contato.text)  ##NUMBER of NON-READ-MESSAGES by User
+               print(f'\nMensagens nao lidas de {user}: {nrm}')
+               tim_msg = driver.find_elements_by_class_name("kOrB_") ##LIST of elements of MESSAGE-TIME
+               log_time = []        ##LIST of MESSAGE-TIME in STR FORMAT
+               for t in tim_msg:
+                   log_time.append(t.text)
+               all_msg = driver.find_elements_by_css_selector(".copyable-text") ##LIST of elements of MESSAGE
+               last_msg = all_msg[-2]
+               for n, msg in enumerate(all_msg):
+                   if msg != last_msg:
+                      message = all_msg[n].text
+                      log_msg.append(message)
+                   else:
+                      break 
+               user_responde = read_msg(user, log_msg, log_time, nrm)
+               for m in user_responde:
+                       user_msg = m
+                       print('user: ', user_msg)
+                       bot_msg = call_faq(user_msg)
+                       time.sleep(2)
+                       print('bot :', bot_msg)
+                       send_msg(bot_msg)
+            except exceptions.StaleElementReferenceException:
+                continue
+            except:
+                print('...')
+                user_find() 
+                time.sleep(5)
+                continue
 
 
