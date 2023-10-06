@@ -48,25 +48,25 @@ def get_keys():
     return keys
 
 def get_info(coin) -> str:
-    for d in data["data"]:
-            if d["name"].lower() == coin:
-                qdata = d["quote"]
-                brldata = qdata["BRL"]
-                brldata = str(brldata).replace('{', '',1)
-                brldata = brldata.replace("'", '')
-                brldata = brldata.replace('}', '', 1)
-                strcoin = coin.title()
-            if d["symbol"].lower() == coin:
+  for d in data["data"]:
+    if d["name"].lower() == coin:
+        qdata = d["quote"]
+        brldata = qdata["BRL"]
+        brldata = str(brldata).replace('{', '',1)
+        brldata = brldata.replace("'", '')
+        brldata = brldata.replace('}', '', 1)
+        strcoin = coin.title()
+    if d["symbol"].lower() == coin:
                 
-                qdata = d["quote"]
-                brldata = qdata["BRL"]
-                brldata = str(brldata).replace('{', '',1)
-                brldata = brldata.replace("'", '')
-                brldata = brldata.replace('}', '', 1)
-                strcoin = '$'+coin.upper()
-    
-    info = 'Ultima atualizacao de '+strcoin+':\n\n'
-    return info+brldata
+      qdata = d["quote"]
+      brldata = qdata["BRL"]
+      brldata = str(brldata).replace('{', '',1)
+      brldata = brldata.replace("'", '')
+      brldata = brldata.replace('}', '', 1)
+      strcoin = f'${coin.upper()}'
+
+  info = f'Ultima atualizacao de {strcoin}' + ':\n\n'
+  return info+brldata
 
 def get_data(coin):
     for d in data["data"]:
