@@ -15,8 +15,8 @@ IS_DEBUG = True
 
 def loading(message, lines=3, dots=3, speed = 200/1000): 
     print(message, '\n')
-    for i in range(0,lines):
-        for i in range(0,dots):
+    for _ in range(0,lines):
+        for _ in range(0,dots):
             sys.stdout.write('.'+' ')
             sys.stdout.flush()
             time.sleep(speed)
@@ -45,14 +45,13 @@ def get_toother_value_counts(messages:list) -> list:
             get_toother_value_counts(None)
     else:
         saved_tooths_path = 'data/libertadores_do_tooth.xlsx'
-        if os.path.isfile(saved_tooths_path):
-            df = pd.read_excel(saved_tooths_path)
-            if df.empty:
-                print('eita')
-                return None
-        else: 
+        if not os.path.isfile(saved_tooths_path):
             return None
-        
+
+        df = pd.read_excel(saved_tooths_path)
+        if df.empty:
+            print('eita')
+            return None
     # Get the value_counts sorted descending for the 'Toother' column
     if isinstance(df, pd.DataFrame):
         print('\nColunas:', list(df.columns))
@@ -61,18 +60,15 @@ def get_toother_value_counts(messages:list) -> list:
         # Return the top names that are repeats in some rows of the excel sheet
         header = '   Top Toother  |  No.Tooths'
         message_to_send = ['Placar Libertadores do Tooth', header]
-        position = 1
-        for i, v in toother_value_counts.items():
+        for position, (i, v) in enumerate(toother_value_counts.items(), start=1):
             row = f'{str(position)}.   {i}           {str(v)}'
             message_to_send.append(row)
-            position += 1
         return message_to_send
     
 
 def convert_time(timestr):
     time_format = '%H:%M %p, %d/%m/%Y'
-    dt_obj = datetime.datetime.strptime(timestr, time_format)
-    return dt_obj
+    return datetime.datetime.strptime(timestr, time_format)
 
 
 def save_messages(messages, filename='data/libertadores_do_tooth.xlsx'):
@@ -100,18 +96,16 @@ def parse_message_string(message_string):
 def get_diff(saved_messages: pd.DataFrame, new_messages: pd.DataFrame) -> pd.DataFrame:
     if not saved_messages.empty and isinstance(saved_messages, pd.DataFrame):
         rows_to_delete = new_messages.eq(saved_messages).all(axis=1)
-        diff = new_messages.drop(rows_to_delete[rows_to_delete == True].index)
-        return diff
+        return new_messages.drop(rows_to_delete[rows_to_delete == True].index)
 
 def get_date_poll(input_text):
     # Define a regex pattern to match the unwanted parts
     pattern = re.compile(r'Enquete enviada por (\w+ \d+:\d+ [APMapm]{2} \d+/\d+ )Opções mais votadas: ')
-    
+
     # Use the regex pattern to replace the unwanted parts with an empty string
     cleaned_text = re.sub(pattern, r'\1', input_text)
     listed_text = cleaned_text.split(' ')
-    data_poll = [p for p in listed_text if '/' in p]
-    return data_poll
+    return [p for p in listed_text if '/' in p]
 
 def is_checkbox(element):
     if element.get_attribute("type"):
@@ -120,38 +114,40 @@ def is_checkbox(element):
         return False
 
 def is_poll(container, text):
-    if '/11' in text:
-        substring = "Enquete enviada por"
-        poll = container.find_element(By.XPATH, f".//*[@aria-label[contains(., '{substring}')]]")
-        if poll:
-            aria_label = poll.get_attribute('aria-label')
-            mostrar_votos = WebDriverWait(driver, 10).until(
-                            EC.presence_of_element_located((By.CSS_SELECTOR, "div[title='Mostrar votos']")))
-            if mostrar_votos and not is_checkbox(mostrar_votos):
-                mostrar_votos.click()
-            poll_info_container = driver.find_element(By.CSS_SELECTOR, "[class$='bs7a17vp']")
-            poll_rows = poll_info_container.find_elements(By.CSS_SELECTOR, "[class$='gx1rr48f']")
-            poll_tooths = []
-            voted = []
-            for n, row in enumerate(poll_rows):
-                row_names = row.find_elements(By.CSS_SELECTOR, ".ggj6brxn.gfz4du6o.r7fjleex.g0rxnol2.lhj4utae.le5p0ye3.enbbiyaj._11JPr")
-                row_tooths = [r.get_attribute('title') for r in row_names if row_names]
-                row_tooths = [{r : n} for r in row_tooths if r not in voted]
-                voted.append([r for r in row_tooths if r not in voted])
-                if row_tooths:
-                    print(f'\n{n}: {row_tooths[0]}')
-                    poll_tooths.append(row_tooths[0])
-            
-            poll_results = {get_date_poll(aria_label)[0] : poll_tooths}
-            close_button = WebDriverWait(driver, 10).until(
-                EC.element_to_be_clickable((By.CSS_SELECTOR, "div[role='button'][aria-label='Fechar']")))
-            # Perform the click action
-            close_button.click()
-            return poll_results
+    if '/11' not in text:
+        return
+    substring = "Enquete enviada por"
+    if poll := container.find_element(
+        By.XPATH, f".//*[@aria-label[contains(., '{substring}')]]"
+    ):
+        aria_label = poll.get_attribute('aria-label')
+        mostrar_votos = WebDriverWait(driver, 10).until(
+                        EC.presence_of_element_located((By.CSS_SELECTOR, "div[title='Mostrar votos']")))
+        if mostrar_votos and not is_checkbox(mostrar_votos):
+            mostrar_votos.click()
+        poll_info_container = driver.find_element(By.CSS_SELECTOR, "[class$='bs7a17vp']")
+        poll_rows = poll_info_container.find_elements(By.CSS_SELECTOR, "[class$='gx1rr48f']")
+        poll_tooths = []
+        voted = []
+        for n, row in enumerate(poll_rows):
+            row_names = row.find_elements(By.CSS_SELECTOR, ".ggj6brxn.gfz4du6o.r7fjleex.g0rxnol2.lhj4utae.le5p0ye3.enbbiyaj._11JPr")
+            row_tooths = [r.get_attribute('title') for r in row_names if row_names]
+            row_tooths = [{r : n} for r in row_tooths if r not in voted]
+            voted.append([r for r in row_tooths if r not in voted])
+            if row_tooths:
+                print(f'\n{n}: {row_tooths[0]}')
+                poll_tooths.append(row_tooths[0])
+
+        poll_results = {get_date_poll(aria_label)[0] : poll_tooths}
+        close_button = WebDriverWait(driver, 10).until(
+            EC.element_to_be_clickable((By.CSS_SELECTOR, "div[role='button'][aria-label='Fechar']")))
+        # Perform the click action
+        close_button.click()
+        return poll_results
     
 if __name__ == '__main__':
     # Open Whatsapp Web
-    options = webdriver.ChromeOptions() 
+    options = webdriver.ChromeOptions()
     options.add_argument(r"user-data-dir=C:\Users\miche\AppData\Local\Google\Chrome\User Data\Default")
     driver = webdriver.Chrome(executable_path=r"C:\Users\miche\Downloads\chromedriver-win64\chromedriver-win64\chromedriver.exe", chrome_options=options)
     loading('Acessando o WhatsApp Web', 8, 8)
@@ -190,12 +186,13 @@ if __name__ == '__main__':
             text_element = focusable_list_items.find_element(By.CSS_SELECTOR, '.copyable-text ._11JPr.selectable-text.copyable-text span')
             text = text_element.text
             if not text:
-                    emoji_element = container.find_element(By.CSS_SELECTOR, 'img[alt="💩"]')
-                    if emoji_element:
-                        text = emoji_element.get_attribute("data-plain-text")
-                    else:
-                        text = '!! ? !!'
-            
+                if emoji_element := container.find_element(
+                    By.CSS_SELECTOR, 'img[alt="💩"]'
+                ):
+                    text = emoji_element.get_attribute("data-plain-text")
+                else:
+                    text = '!! ? !!'
+
             if not is_poll(container, text):
                 date_time, sender = parse_message_string(data_pre_plain_text)
                 row = {'index': n-4,
@@ -204,11 +201,11 @@ if __name__ == '__main__':
                         'Mensagem': text}
                 print(f'\n{n}: {row}')
                 all_messages.append(row)
-            
+
             else:
                 print('is poll:',  is_poll(container, text))
                 total_polls.append(is_poll(container, text))
-        
+
         last_message = all_messages[-1]
         print('last message:', last_message)
         message_to_send = str(total_polls)
@@ -218,7 +215,7 @@ if __name__ == '__main__':
             if last_message['Mensagem'] == '/placar':
                     send_msg(message_to_send)
                     print('Mensagem enviada:', sum(total_polls))
-        
+
         print('total pools', total_polls)
         print(all_messages)
         time.sleep(20)
