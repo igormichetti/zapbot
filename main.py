@@ -54,7 +54,8 @@ def get_toother_value_counts(messages:list) -> list:
             return None
         
     # Get the value_counts sorted descending for the 'Toother' column
-    if 'Toother' in list(df.columns):
+    if isinstance(df, pd.DataFrame):
+        print('\nColunas:', list(df.columns))
         toother_value_counts = df.value_counts('Toother', ascending=False)
 
         # Return the top names that are repeats in some rows of the excel sheet
@@ -67,10 +68,6 @@ def get_toother_value_counts(messages:list) -> list:
             position += 1
         return message_to_send
     
-    else:
-        print('cade')
-        print(df)
-        return None
 
 def convert_time(timestr):
     time_format = '%H:%M %p, %d/%m/%Y'
@@ -157,20 +154,21 @@ if __name__ == '__main__':
     options = webdriver.ChromeOptions() 
     options.add_argument(r"user-data-dir=C:\Users\miche\AppData\Local\Google\Chrome\User Data\Default")
     driver = webdriver.Chrome(executable_path=r"C:\Users\miche\Downloads\chromedriver-win64\chromedriver-win64\chromedriver.exe", chrome_options=options)
-    loading('Acessando o WhatsApp Web', 4, 4)
+    loading('Acessando o WhatsApp Web', 8, 8)
     driver.get('https://web.whatsapp.com/')
     grupo = WebDriverWait(driver, 20)\
-        .until(EC.element_to_be_clickable((By.XPATH,'//*[@id="pane-side"]/div/div/div/div[1]/div/div')))
-    if grupo and not is_checkbox(grupo):
+        .until(EC.visibility_of_element_located((By.XPATH,'//*[@id="pane-side"]/div/div/div/div[1]/div/div')))
+    if not is_checkbox(grupo):
         grupo.click()
+    time.sleep(2)  # Adjust the sleep duration as needed
     c = 0
     # Continuously check for new messages
     while True:
         total_polls = []
         c += 1
-        main_container = WebDriverWait(driver, 20).until(EC.element_to_be_clickable((By.ID, 'main')))
-        main_container.click()
-
+        main_container = WebDriverWait(driver, 20).until(EC.visibility_of_element_located((By.ID, 'main')))
+        if not is_checkbox(main_container):
+            main_container.click()
         # Use ActionChains to press and hold the HOME key, then sleep for 2 seconds, and release the key
         actions = ActionChains(driver)
         actions.key_down(Keys.HOME).perform()
@@ -182,6 +180,7 @@ if __name__ == '__main__':
         # Iterate through message containers
         all_messages = []
         for n, container in enumerate(containers):
+            time.sleep(0.2)
             # Extract data-pre-plain-text attribute
             print('n', n)
             if n < 3: continue
@@ -203,6 +202,7 @@ if __name__ == '__main__':
                         'Data': date_time,
                         'Toother': sender,
                         'Mensagem': text}
+                print(f'\n{n}: {row}')
                 all_messages.append(row)
             
             else:
@@ -210,13 +210,15 @@ if __name__ == '__main__':
                 total_polls.append(is_poll(container, text))
         
         last_message = all_messages[-1]
-        message_to_send = get_toother_value_counts(total_polls)
+        print('last message:', last_message)
+        message_to_send = str(total_polls)
         print('\nmessage to send ', message_to_send)
         if message_to_send:
             save_messages(all_messages, 'data/all_messages.xlsx')
             if last_message['Mensagem'] == '/placar':
                     send_msg(message_to_send)
-                    print('Mensagem enviada:', get_toother_value_counts(total_polls))
+                    print('Mensagem enviada:', sum(total_polls))
         
         print('total pools', total_polls)
+        print(all_messages)
         time.sleep(20)
