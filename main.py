@@ -4,8 +4,10 @@ from selenium.webdriver.common.keys import Keys #SPECIAL KEYS MODULE
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+from selenium.common.exceptions import TimeoutException
 from selenium.webdriver.common.action_chains import ActionChains
 import pandas as pd
+import gsheets
 
 #SETING ENV VARIABLES
 CHROME_PATH = r'C:\Users\miche\AppData\Local\Google\Chrome\User Data\Default'
@@ -129,8 +131,7 @@ def is_poll(container, text):
                             EC.presence_of_element_located((By.CSS_SELECTOR, "div[title='Mostrar votos']")))
             if mostrar_votos and not is_checkbox(mostrar_votos):
                 mostrar_votos.click()
-            poll_info_container = driver.find_element(By.CSS_SELECTOR, "[class$='bs7a17vp']")
-            poll_rows = poll_info_container.find_elements(By.CSS_SELECTOR, "[class$='gx1rr48f']")
+            poll_rows = driver.find_elements(By.CSS_SELECTOR, "[class$='gx1rr48f']")
             poll_tooths = []
             voted = []
             for n, row in enumerate(poll_rows):
@@ -143,50 +144,76 @@ def is_poll(container, text):
                     poll_tooths.append(row_tooths[0])
             
             poll_results = {get_date_poll(aria_label)[0] : poll_tooths}
-            close_button = WebDriverWait(driver, 10).until(
-                EC.element_to_be_clickable((By.CSS_SELECTOR, "div[role='button'][aria-label='Fechar']")))
-            # Perform the click action
-            close_button.click()
+            try:
+                body = driver.find_element(By.TAG_NAME, 'body')
+                driver.execute_script("arguments[0].focus();", body)
+                time.sleep(2)
+                close_section_script = """
+                                    var closeButton = document.querySelector('div[aria-label="Fechar"]');
+                                    if (closeButton) {
+                                        var clickEvent = new MouseEvent('click', {
+                                            bubbles: true,
+                                            cancelable: true,
+                                            view: window
+                                        });
+                                        closeButton.dispatchEvent(clickEvent);
+                                        }""" 
+                
+                driver.execute_script(close_section_script)
+                # close_button = WebDriverWait(driver, 10).until(EC.presence_of_element_located(
+                #                                 (By.XPATH, "//div[@aria-label='Fechar']")))
+
+                # actions = ActionChains(driver)
+                # actions.move_to_element(close_button).click().perform()
+                time.sleep(2)
+            except TimeoutException:
+                print("Close button not found within the specified timeout. Continuing with the script.")
+                driver.quit()
+
             return poll_results
-    
+        
+def disable_checkbox(driver):
+    disable_checkbox_script = """
+                var checkbox = document.querySelector('.g0rxnol2.l7jjieqr.dh5rsm73.hpdpob1j.neme6l2y.ajgl1lbb.ig3kka7n.a57u14ck.a4bg1r4i.h1a3x9ys.cgi16xlc.lgxs6e1q');
+                if (checkbox) {
+                    checkbox.disabled = true;
+                }
+            """
+
+    driver.execute_script(disable_checkbox_script)
+
 if __name__ == '__main__':
-    # Open Whatsapp Web
     options = webdriver.ChromeOptions() 
     options.add_argument(r"user-data-dir=C:\Users\miche\AppData\Local\Google\Chrome\User Data\Default")
     driver = webdriver.Chrome(executable_path=r"C:\Users\miche\Downloads\chromedriver-win64\chromedriver-win64\chromedriver.exe", chrome_options=options)
     loading('Acessando o WhatsApp Web', 8, 8)
     driver.get('https://web.whatsapp.com/')
+    time.sleep(2)
     grupo = WebDriverWait(driver, 20)\
         .until(EC.visibility_of_element_located((By.XPATH,'//*[@id="pane-side"]/div/div/div/div[1]/div/div')))
+    disable_checkbox(driver)
     if not is_checkbox(grupo):
         grupo.click()
-    time.sleep(2)  # Adjust the sleep duration as needed
+    time.sleep(2)  
     c = 0
-    # Continuously check for new messages
     while True:
         total_polls = []
         c += 1
         main_container = WebDriverWait(driver, 20).until(EC.visibility_of_element_located((By.ID, 'main')))
         if not is_checkbox(main_container):
             main_container.click()
-        # Use ActionChains to press and hold the HOME key, then sleep for 2 seconds, and release the key
         actions = ActionChains(driver)
         actions.key_down(Keys.HOME).perform()
-        time.sleep(2)  # Adjust the sleep duration as needed
+        time.sleep(5)  
         actions.key_up(Keys.HOME).perform()
-
-        # Wait for message containers to appear
         containers = WebDriverWait(main_container, 10).until(EC.presence_of_all_elements_located((By.CLASS_NAME, "CzM4m")))
-        # Iterate through message containers
         all_messages = []
         for n, container in enumerate(containers):
-            time.sleep(0.2)
-            # Extract data-pre-plain-text attribute
+            time.sleep(0.1)
             print('n', n)
             if n < 3: continue
             focusable_list_items = container.find_element(By.CSS_SELECTOR, '.focusable-list-item')
             data_pre_plain_text = focusable_list_items.find_element(By.CLASS_NAME, 'copyable-text').get_attribute('data-pre-plain-text')
-            # Extract text from child span within the copyable-text div
             text_element = focusable_list_items.find_element(By.CSS_SELECTOR, '.copyable-text ._11JPr.selectable-text.copyable-text span')
             text = text_element.text
             if not text:
@@ -209,16 +236,18 @@ if __name__ == '__main__':
                 print('is poll:',  is_poll(container, text))
                 total_polls.append(is_poll(container, text))
         
-        last_message = all_messages[-1]
-        print('last message:', last_message)
-        message_to_send = str(total_polls)
-        print('\nmessage to send ', message_to_send)
-        if message_to_send:
-            save_messages(all_messages, 'data/all_messages.xlsx')
-            if last_message['Mensagem'] == '/placar':
-                    send_msg(message_to_send)
-                    print('Mensagem enviada:', sum(total_polls))
+        # last_message = all_messages[-1]
+        # message_to_send = str(total_polls)
+        # print('\nmessage to send ', message_to_send)
+        # if message_to_send:
+        #     save_messages(all_messages, 'data/all_messages.xlsx')
+        #     if last_message['Mensagem'] == '/placar':
+        #             send_msg(message_to_send)
+        #             print('Mensagem enviada:', sum(total_polls))
         
         print('total pools', total_polls)
-        print(all_messages)
-        time.sleep(20)
+        gsheets.save_to_google_sheet(all_messages, 'libertooth')
+        df = gsheets.read_google_sheet('libertooth')
+        print('\nData from Libertooth:\n')
+        print(df.to_string(index=False))
+        time.sleep(100)
